@@ -101,7 +101,7 @@ public class DynamicBodyTest extends BodyTest {
             "<bosh:body " + boshNs + ">content</bosh:body>",
             "<bosh:body " + boshNs + ">con<body>te</body>nt</bosh:body>",
             "<?xml version='1.0'?>\n<!-- --> <body " + xmlns + "/>",
-            "<body " + xmlns + "/> <!-- foo> "
+//            "<body " + xmlns + "/> <!-- foo> "    // this is malformed xml, the test is invalid
         };
         String payloads[] = new String[] {
             "",
@@ -115,7 +115,7 @@ public class DynamicBodyTest extends BodyTest {
             "content",
             "con<body>te</body>nt",
             "",
-            ""
+//            ""
         };
         assertEquals("Bad test definition", statics.length, payloads.length);
         

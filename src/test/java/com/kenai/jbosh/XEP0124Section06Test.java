@@ -33,7 +33,7 @@ public class XEP0124Section06Test extends AbstractBOSHTest {
      * wrapper element qualified by the 'http://jabber.org/protocol/httpbind'
      * namespace.
      */
-    @Test(timeout=5000)
+    @Test(timeout=5000, expected = BOSHException.class)
     public void singleBodyElementPerRequest() throws Exception {
         logTestStart();
         testedBy(RequestValidator.class, "assertSingleBodyElement");
@@ -46,22 +46,22 @@ public class XEP0124Section06Test extends AbstractBOSHTest {
         ComposableBody db = ComposableBody.fromStaticBody(sb);
         LOG.info("Sending: " + db.toXML());
         session.send(ComposableBody.fromStaticBody(sb));
-        conn = cm.awaitConnection();
-        AbstractBody scr = ComposableBody.builder()
-                .setAttribute(Attributes.SID, "123XYZ")
-                .setAttribute(Attributes.WAIT, "1")
-                .build();
-        conn.sendResponse(scr);
-        boolean failed = false;
-        try {
-            assertValidators(scr);
-            failed = true;
-        } catch (AssertionError err) {
-            failed = false;
-        }
-        if (failed) {
-            fail("Did not catch multiple bodies");
-        }
+//        conn = cm.awaitConnection();
+//        AbstractBody scr = ComposableBody.builder()
+//                .setAttribute(Attributes.SID, "123XYZ")
+//                .setAttribute(Attributes.WAIT, "1")
+//                .build();
+//        conn.sendResponse(scr);
+//        boolean failed = false;
+//        try {
+//            assertValidators(scr);
+//            failed = true;
+//        } catch (AssertionError err) {
+//            failed = false;
+//        }
+//        if (failed) {
+//            fail("Did not catch multiple bodies");
+//        }
     }
 
     /*
@@ -84,7 +84,7 @@ public class XEP0124Section06Test extends AbstractBOSHTest {
     /*
      * The content MUST NOT contain Partial XML elements.
      */
-    @Test(timeout=5000)
+    @Test(timeout=5000, expected=BOSHException.class)
     public void noPartialElements() throws Exception {
         logTestStart();
         testedBy(RequestValidator.class, "assertValidXML");
@@ -95,22 +95,22 @@ public class XEP0124Section06Test extends AbstractBOSHTest {
         // Attempt to send a body containing comments
         StaticBody sb = StaticBody.fromString(body1);
         session.send(ComposableBody.fromStaticBody(sb));
-        StubConnection conn = cm.awaitConnection();
-        AbstractBody scr = ComposableBody.builder()
-                .setAttribute(Attributes.SID, "123XYZ")
-                .setAttribute(Attributes.WAIT, "1")
-                .build();
-        conn.sendResponse(scr);
-        boolean failed = false;
-        try {
-            assertValidators(scr);
-            failed = true;
-        } catch (AssertionError err) {
-            failed = false;
-        }
-        if (failed) {
-            fail("Did not catch partial element");
-        }
+//        StubConnection conn = cm.awaitConnection();
+//        AbstractBody scr = ComposableBody.builder()
+//                .setAttribute(Attributes.SID, "123XYZ")
+//                .setAttribute(Attributes.WAIT, "1")
+//                .build();
+//        conn.sendResponse(scr);
+//        boolean failed = false;
+//        try {
+//            assertValidators(scr);
+//            failed = true;
+//        } catch (AssertionError err) {
+//            failed = false;
+//        }
+//        if (failed) {
+//            fail("Did not catch partial element");
+//        }
     }
 
     /*

@@ -16,13 +16,28 @@
 
 package com.kenai.jbosh;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.StringReader;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.*;
 
 /**
  * Implementation of the {@code AbstractBody} class which allows for the
@@ -53,13 +68,8 @@ import javax.xml.XMLConstants;
  */
 public final class ComposableBody extends AbstractBody {
 
-    /**
-     * Pattern used to identify the beginning {@code body} element of a
-     * BOSH message.
-     */
-    private static final Pattern BOSH_START =
-            Pattern.compile("<" + "(?:(?:[^:\t\n\r >]+:)|(?:\\{[^\\}>]*?}))?"
-            + "body" + "(?:[\t\n\r ][^>]*?)?" + "(/>|>)");
+    private static final DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
+    private static final TransformerFactory factory = TransformerFactory.newInstance();
 
     /**
      * Map of all attributes to their values.
@@ -217,22 +227,108 @@ public final class ComposableBody extends AbstractBody {
     static ComposableBody fromStaticBody(final StaticBody body)
     throws BOSHException {
         String raw = body.toXML();
-        Matcher matcher = BOSH_START.matcher(raw);
-        if (!matcher.find()) {
-            throw(new BOSHException(
-                    "Could not locate 'body' element in XML.  The raw XML did"
-                    + " not match the pattern: " + BOSH_START));
+
+        Document doc = null;
+        Node bodyNode = null;
+
+        DocumentBuilder db = null;
+        try {
+            db = docBuilderFactory.newDocumentBuilder();
+
+            InputSource is =  new InputSource();
+            is.setCharacterStream(new StringReader(raw));
+
+            doc = db.parse(is);
+        } catch (ParserConfigurationException e) {
+            throw new BOSHException("Invalid xml", e);
+        } catch (SAXException e) {
+            throw new BOSHException("Invalid xml", e);
+        } catch (IOException e) {
+            throw new BOSHException("Invalid xml", e);
         }
-        String payload;
-        if (">".equals(matcher.group(1))) {
-            int first = matcher.end();
-            int last = raw.lastIndexOf("</");
-            if (last < first) {
-                last = first;
-            }
-            payload = raw.substring(first, last);
+
+        if (doc == null) {
+            throw new BOSHException("Invalid xml");
+        }
+
+        NodeList rootNodes = doc.getChildNodes();
+        if (rootNodes.getLength() == 1) {
+            bodyNode = doc.getFirstChild();
         } else {
-            payload = "";
+            boolean foundElement = false;
+            for (int i = 0; i < rootNodes.getLength(); i++) {
+
+                Node node = rootNodes.item(i);
+                int nodeType = node.getNodeType();
+                if (nodeType == Node.ELEMENT_NODE) {
+                    if (foundElement) {
+                        throw new BOSHException("Expected exactly one content node");
+                    }
+
+                    bodyNode = node;
+                    foundElement = true;
+                } else if (nodeType == Node.COMMENT_NODE) {
+                    // ok, we'll skip comments
+                } else {
+                    throw new BOSHException("Invalid xml, expected exactly one content node");
+                }
+            }
+        }
+
+        if (bodyNode == null) {
+            throw new BOSHException("Invalid xml, could not get body node");
+        }
+
+        // getLocalName is returning null
+        String nodeName = bodyNode.getNodeName();
+        if (nodeName.contains(":")) {
+            nodeName = nodeName.substring(nodeName.indexOf(":") + 1);
+        }
+
+        if (!nodeName.equals("body")) {
+            throw new BOSHException("Expected body element, found: " + bodyNode.getNodeName());
+        }
+
+        // get the dom representation of body
+
+        String payload = "";
+
+        try {
+            Transformer transformer = factory.newTransformer();
+
+            Properties properties = new Properties();
+            properties.setProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+
+            transformer.setOutputProperties(properties);
+
+            final StringBuilder sb = new StringBuilder();
+
+
+            NodeList childNodes = bodyNode.getChildNodes();
+            for (int i = 0; i < childNodes.getLength(); i++) {
+                Node child = childNodes.item(i);
+
+                int nodeType = child.getNodeType();
+
+                javax.xml.transform.dom.DOMSource domSource = new javax.xml.transform.dom.DOMSource(child);
+                javax.xml.transform.stream.StreamResult result = new javax.xml.transform.stream.StreamResult(new OutputStream() {
+
+                    @Override
+                    public void write(int i) throws IOException {
+                        sb.append((char)i);
+                    }
+                });
+
+                transformer.transform(domSource, result);
+            }
+
+
+            payload = sb.toString();
+
+        } catch (TransformerConfigurationException e) {
+            throw new BOSHException("Invalid xml", e);
+        } catch (TransformerException e) {
+            throw new BOSHException("Invalid xml", e);
         }
 
         return new ComposableBody(body.getAttributes(), payload);
