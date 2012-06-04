@@ -1038,6 +1038,10 @@ public final class BOSHClient {
             LOG.log(Level.FINEST, INTERRUPTED, intx);
             dispose(intx);
             return;
+        } catch (Throwable t) {
+            LOG.log(Level.FINEST, "Unhanlded error while processing exchange", t);
+            dispose(t);
+            return;
         }
         fireResponseReceived(body);
 
