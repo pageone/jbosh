@@ -817,6 +817,8 @@ public final class BOSHClient {
     private void blockUntilSendable(final AbstractBody msg) {
         assertLocked();
 
+        LOG.log(Level.FINEST, "blocking until sendable");
+
         while (isWorking() && !isImmediatelySendable(msg)) {
             try {
                 notFull.await();
@@ -824,6 +826,8 @@ public final class BOSHClient {
                 LOG.log(Level.FINEST, INTERRUPTED, intx);
             }
         }
+
+        LOG.log(Level.FINEST, "now sendable");
     }
 
     /**
