@@ -232,7 +232,7 @@ public final class BOSHClient {
      * HTTPSender instance.
      */
     private final HTTPSender httpSender =
-            ServiceLib.loadService(HTTPSender.class);
+            new ApacheHTTPSender();
 
     /**
      * Storage for test hook implementation.
