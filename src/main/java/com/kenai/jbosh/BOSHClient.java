@@ -1032,7 +1032,10 @@ public final class BOSHClient {
         int respCode;
         try {
             resp = exch.getHTTPResponse();
+
+            // this will actually trigger the blocking call, not sure what is supposed to happen here
             body = resp.getBody();
+
             respCode = resp.getHTTPStatus();
         } catch (BOSHException boshx) {
             LOG.log(Level.FINEST, "Could not obtain response", boshx);

@@ -17,6 +17,7 @@
 package com.kenai.jbosh;
 
 import java.io.IOException;
+import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -101,6 +102,11 @@ final class ApacheHTTPResponse implements HTTPResponse {
      */
     private int statusCode;
 
+    private final Future<HttpResponse> apacheResponse;
+
+    // static, will be used for all instances
+    private static final ExecutorService executor = Executors.newFixedThreadPool(2);
+
     ///////////////////////////////////////////////////////////////////////////
     // Constructors:
 
@@ -155,6 +161,19 @@ final class ApacheHTTPResponse implements HTTPResponse {
         } catch (Exception e) {
             toThrow = new BOSHException("Could not generate request", e);
         }
+
+        if (toThrow == null) {
+            // actually issue the request right now too
+            apacheResponse = executor.submit(new Callable<HttpResponse>() {
+                public HttpResponse call() throws Exception {
+                    return client.execute(post, context);
+                }
+            });
+        } else {
+            // error already, not going to execute the request
+            apacheResponse = null;
+        }
+
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -226,8 +245,15 @@ final class ApacheHTTPResponse implements HTTPResponse {
      */
     private synchronized void awaitResponse() throws BOSHException {
         HttpEntity entity = null;
+
+        if (apacheResponse == null) {
+            throw new BOSHException("Response was not initialized properly");
+        }
+
         try {
-            HttpResponse httpResp = client.execute(post, context);
+            HttpResponse httpResp = apacheResponse.get();
+
+//            HttpResponse httpResp = client.execute(post, context);
             entity = httpResp.getEntity();
             byte[] data = EntityUtils.toByteArray(entity);
             String encoding = entity.getContentEncoding() != null ?
@@ -248,6 +274,14 @@ final class ApacheHTTPResponse implements HTTPResponse {
         } catch (RuntimeException ex) {
             abort();
             throw(ex);
+        } catch (InterruptedException e) {
+            // interrupted during execution
+            toThrow = new BOSHException("Interrupted during execution", e);
+            throw toThrow;
+        } catch (ExecutionException e) {
+            // error during execution
+            toThrow = new BOSHException("Error while executing request", e);
+            throw toThrow;
         }
     }
 }
