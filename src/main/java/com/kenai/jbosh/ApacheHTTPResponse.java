@@ -102,10 +102,18 @@ final class ApacheHTTPResponse implements HTTPResponse {
      */
     private int statusCode;
 
-    private final Future<HttpResponse> apacheResponse;
+    private Future<HttpResponse> apacheResponse;
 
     // static, will be used for all instances
-    private static final ExecutorService executor = Executors.newFixedThreadPool(2);
+    private static final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+        private ThreadFactory defaultFactory = Executors.defaultThreadFactory();
+        private long num = 1;
+        public Thread newThread(Runnable runnable) {
+            Thread t = defaultFactory.newThread(runnable);
+            t.setName("[ApacheHTTPResponse processor #" + num++ + "]");
+            return t;
+        }
+    });
 
     ///////////////////////////////////////////////////////////////////////////
     // Constructors:
@@ -164,11 +172,18 @@ final class ApacheHTTPResponse implements HTTPResponse {
 
         if (toThrow == null) {
             // actually issue the request right now too
-            apacheResponse = executor.submit(new Callable<HttpResponse>() {
-                public HttpResponse call() throws Exception {
-                    return client.execute(post, context);
-                }
-            });
+
+            try {
+                apacheResponse = executor.submit(new Callable<HttpResponse>() {
+                    public HttpResponse call() throws Exception {
+                        return client.execute(post, context);
+                    }
+                });
+            } catch (Throwable t) {
+                toThrow = new BOSHException("Error trying to execute request", t);
+                apacheResponse = null;
+            }
+
         } else {
             // error already, not going to execute the request
             apacheResponse = null;
@@ -252,8 +267,6 @@ final class ApacheHTTPResponse implements HTTPResponse {
 
         try {
             HttpResponse httpResp = apacheResponse.get();
-
-//            HttpResponse httpResp = client.execute(post, context);
             entity = httpResp.getEntity();
             byte[] data = EntityUtils.toByteArray(entity);
             String encoding = entity.getContentEncoding() != null ?
