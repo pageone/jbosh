@@ -949,40 +949,46 @@ public final class BOSHClient {
      */
     private void processMessages() {
         LOG.log(Level.FINEST, "Processing thread starting");
-        try {
-            HTTPExchange exch;
-            do {
-                exch = nextExchange();
-                if (exch == null) {
-                    break;
-                }
 
-                // Test hook to manipulate what the client sees:
-                ExchangeInterceptor interceptor = exchInterceptor.get();
-                if (interceptor != null) {
-                    HTTPExchange newExch = interceptor.interceptExchange(exch);
-                    if (newExch == null) {
-                        LOG.log(Level.FINE, "Discarding exchange on request "
-                                + "of test hook: RID="
-                                + exch.getRequest().getAttribute(
-                                    Attributes.RID));
-                        lock.lock();
-                        try {
-                            exchanges.remove(exch);
-                        } finally {
-                            lock.unlock();
-                        }
-                        continue;
+        while (procThread != null) {
+
+            try {
+                HTTPExchange exch;
+                do {
+                    exch = nextExchange();
+                    if (exch == null) {
+                        break;
                     }
-                    exch = newExch;
-                }
 
-                processExchange(exch);
-            } while (true);
-        } finally {
-            LOG.log(Level.FINEST, "Processing thread exiting");
+                    // Test hook to manipulate what the client sees:
+                    ExchangeInterceptor interceptor = exchInterceptor.get();
+                    if (interceptor != null) {
+                        HTTPExchange newExch = interceptor.interceptExchange(exch);
+                        if (newExch == null) {
+                            LOG.log(Level.FINE, "Discarding exchange on request "
+                                    + "of test hook: RID="
+                                    + exch.getRequest().getAttribute(
+                                        Attributes.RID));
+                            lock.lock();
+                            try {
+                                exchanges.remove(exch);
+                            } finally {
+                                lock.unlock();
+                            }
+                            continue;
+                        }
+                        exch = newExch;
+                    }
+
+                    // this might trigger an excpetion
+                    processExchange(exch);
+                } while (true);
+            } catch (Throwable t) {
+                LOG.log(Level.FINEST, "Unhandled exception while processing", t);
+            }
         }
 
+        LOG.log(Level.FINEST, "Processing thread exiting");
     }
 
     /**
