@@ -105,7 +105,7 @@ final class ApacheHTTPResponse implements HTTPResponse {
     private Future<HttpResponse> apacheResponse;
 
     // static, will be used for all instances
-    private static final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
+    private final ExecutorService executor = Executors.newCachedThreadPool(new ThreadFactory() {
         private ThreadFactory defaultFactory = Executors.defaultThreadFactory();
         private long num = 1;
         public Thread newThread(Runnable runnable) {
